@@ -89,7 +89,7 @@ function M.stop()
   state.paused = false
   cleanup_socket()
   if M._on_state_change then
-    M._on_state_change()
+    pcall(M._on_state_change)
   end
 end
 

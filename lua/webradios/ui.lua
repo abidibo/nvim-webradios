@@ -126,8 +126,13 @@ local function trigger_search()
 
   vim.cmd("stopinsert")
 
+  local search_keyword = keyword
   api.search(keyword, function(stations, err)
-    render_results(stations, err)
+    if not err and stations and #stations == 0 then
+      render_results(stations, "No stations found for '" .. search_keyword .. "'")
+    else
+      render_results(stations, err)
+    end
   end)
 end
 
@@ -154,13 +159,13 @@ render_results = function(stations, error_msg)
 
     for _, s in ipairs(ui_state.stations) do
       local name = s.name
-      if #name > name_w then
-        name = name:sub(1, name_w - 1) .. "…"
+      if vim.fn.strchars(name) > name_w then
+        name = vim.fn.strcharpart(name, 0, name_w - 1) .. "…"
       end
 
       local tags = s.tags
-      if #tags > tags_w then
-        tags = tags:sub(1, tags_w - 1) .. "…"
+      if vim.fn.strchars(tags) > tags_w then
+        tags = vim.fn.strcharpart(tags, 0, tags_w - 1) .. "…"
       end
 
       local bitrate = s.bitrate > 0 and (tostring(s.bitrate) .. " kbps") or ""
@@ -269,12 +274,6 @@ function M.open()
     separator,
     "",
   })
-
-  vim.api.nvim_set_hl(0, "WebradiosSearch", { bold = true })
-  vim.api.nvim_set_hl(0, "WebradiosSeparator", { fg = "#555555" })
-  vim.api.nvim_set_hl(0, "WebradiosStation", { bold = true })
-  vim.api.nvim_set_hl(0, "WebradiosBitrate", { fg = "#888888" })
-  vim.api.nvim_set_hl(0, "WebradiosStatus", { fg = "#aaaaaa", italic = true })
 
   set_keybindings()
   render_status_bar()
