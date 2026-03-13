@@ -106,7 +106,7 @@ function M.volume_up()
     return
   end
   state.volume = math.min(100, (state.volume or config.options.volume) + config.options.volume_step)
-  send_ipc({ "set", "volume", state.volume })
+  send_ipc({ "set", "volume", tostring(state.volume) })
   if M._on_state_change then
     M._on_state_change()
   end
@@ -117,7 +117,7 @@ function M.volume_down()
     return
   end
   state.volume = math.max(0, (state.volume or config.options.volume) - config.options.volume_step)
-  send_ipc({ "set", "volume", state.volume })
+  send_ipc({ "set", "volume", tostring(state.volume) })
   if M._on_state_change then
     M._on_state_change()
   end
