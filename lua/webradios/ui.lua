@@ -287,6 +287,18 @@ function M.open()
     end
   end
 
+  -- Redirect any insert mode attempt to the search line
+  vim.api.nvim_create_autocmd("InsertEnter", {
+    buffer = ui_state.buf,
+    callback = function()
+      local row = vim.api.nvim_win_get_cursor(ui_state.win)[1]
+      if row ~= 1 then
+        vim.bo[ui_state.buf].modifiable = true
+        vim.api.nvim_win_set_cursor(ui_state.win, { 1, 2 })
+      end
+    end,
+  })
+
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = ui_state.buf,
     once = true,

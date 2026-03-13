@@ -28,16 +28,13 @@ local function send_ipc(command_table)
 
   local json = vim.json.encode({ command = command_table }) .. "\n"
 
-  local pipe = vim.uv.new_pipe(false)
-  pipe:connect(socket_path, function(err)
-    if err then
-      pipe:close()
-      return
-    end
-    pipe:write(json, function()
-      pipe:close()
-    end)
-  end)
+  -- Use Neovim's sockconnect to write to mpv's UNIX domain socket
+  local ok, channel = pcall(vim.fn.sockconnect, "pipe", socket_path, { rpc = false })
+  if not ok or channel == 0 then
+    return
+  end
+  pcall(vim.fn.chansend, channel, json)
+  pcall(vim.fn.chanclose, channel)
 end
 
 function M.play(station)
