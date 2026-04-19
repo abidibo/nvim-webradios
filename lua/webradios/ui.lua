@@ -4,6 +4,8 @@ local player = require("webradios.player")
 
 local M = {}
 
+local placeholder_ns = vim.api.nvim_create_namespace("webradios_placeholder")
+
 local ui_state = {
   buf = nil,
   win = nil,
@@ -25,10 +27,51 @@ local function get_dimensions()
   return { width = width, height = height, row = row, col = col }
 end
 
+local function render_search_placeholder()
+  if not is_open() then
+    return
+  end
+  local line = vim.api.nvim_buf_get_lines(ui_state.buf, 0, 1, false)[1] or ""
+  local content = line:gsub("^>%s*", ""):gsub("%s+$", "")
+  vim.api.nvim_buf_clear_namespace(ui_state.buf, placeholder_ns, 0, 1)
+  if content == "" then
+    vim.api.nvim_buf_set_extmark(ui_state.buf, placeholder_ns, 0, 3, {
+      virt_text = { { "Search station...", "Comment" } },
+      virt_text_pos = "inline",
+    })
+  end
+end
+
+local HELP_LINES = {
+  "  <CR>  Play / Search     /     New search",
+  "  p     Pause / Resume    s     Stop",
+  "  +     Volume up         -     Volume down",
+  "  q     Close             <Esc> Close",
+}
+
 -- Forward declarations
+local render_help
 local render_status_bar
 local set_keybindings
 local render_results
+
+render_help = function()
+  if not is_open() then
+    return
+  end
+
+  local dim = get_dimensions()
+  local separator = string.rep("─", dim.width)
+  local was_modifiable = vim.bo[ui_state.buf].modifiable
+  vim.bo[ui_state.buf].modifiable = true
+  local lines = { separator }
+  for _, line in ipairs(HELP_LINES) do
+    table.insert(lines, line)
+  end
+  local line_count = vim.api.nvim_buf_line_count(ui_state.buf)
+  vim.api.nvim_buf_set_lines(ui_state.buf, line_count, line_count, false, lines)
+  vim.bo[ui_state.buf].modifiable = was_modifiable
+end
 
 render_status_bar = function()
   if not is_open() then
@@ -49,10 +92,12 @@ render_status_bar = function()
     status = "⏹ Stopped"
   end
 
+  -- status line sits above the fixed help block (help separator + HELP_LINES)
   local line_count = vim.api.nvim_buf_line_count(ui_state.buf)
+  local status_idx = line_count - #HELP_LINES - 2
   local was_modifiable = vim.bo[ui_state.buf].modifiable
   vim.bo[ui_state.buf].modifiable = true
-  vim.api.nvim_buf_set_lines(ui_state.buf, line_count - 1, line_count, false, { " " .. status })
+  vim.api.nvim_buf_set_lines(ui_state.buf, status_idx, status_idx + 1, false, { " " .. status })
   vim.bo[ui_state.buf].modifiable = was_modifiable
 end
 
@@ -87,18 +132,20 @@ local function new_search()
   local dim = get_dimensions()
   local separator = string.rep("─", dim.width)
   vim.api.nvim_buf_set_lines(ui_state.buf, 0, -1, false, {
-    "> ",
+    ">  ",
     separator,
     "",
     separator,
     "",
   })
 
+  render_help()
   render_status_bar()
+  render_search_placeholder()
 
   -- Ensure buffer stays modifiable for insert mode on search line
   vim.bo[ui_state.buf].modifiable = true
-  vim.api.nvim_win_set_cursor(ui_state.win, { 1, 2 })
+  vim.api.nvim_win_set_cursor(ui_state.win, { 1, 3 })
   vim.cmd("startinsert")
 end
 
@@ -122,6 +169,8 @@ local function trigger_search()
     separator,
     "",
   })
+  render_help()
+  render_status_bar()
   vim.bo[ui_state.buf].modifiable = false
 
   vim.cmd("stopinsert")
@@ -186,6 +235,7 @@ render_results = function(stations, error_msg)
   table.insert(lines, "")
 
   vim.api.nvim_buf_set_lines(ui_state.buf, 2, -1, false, lines)
+  render_help()
   vim.bo[ui_state.buf].modifiable = false
 
   render_status_bar()
@@ -268,7 +318,7 @@ function M.open()
   vim.bo[ui_state.buf].modifiable = true
   local separator = string.rep("─", dim.width)
   vim.api.nvim_buf_set_lines(ui_state.buf, 0, -1, false, {
-    "> ",
+    ">  ",
     separator,
     "",
     separator,
@@ -276,7 +326,9 @@ function M.open()
   })
 
   set_keybindings()
+  render_help()
   render_status_bar()
+  render_search_placeholder()
 
   -- Ensure buffer stays modifiable for insert mode on search line
   vim.bo[ui_state.buf].modifiable = true
@@ -287,6 +339,11 @@ function M.open()
     end
   end
 
+  vim.api.nvim_create_autocmd({ "TextChangedI", "TextChanged" }, {
+    buffer = ui_state.buf,
+    callback = render_search_placeholder,
+  })
+
   -- Redirect any insert mode attempt to the search line
   vim.api.nvim_create_autocmd("InsertEnter", {
     buffer = ui_state.buf,
@@ -294,7 +351,7 @@ function M.open()
       local row = vim.api.nvim_win_get_cursor(ui_state.win)[1]
       if row ~= 1 then
         vim.bo[ui_state.buf].modifiable = true
-        vim.api.nvim_win_set_cursor(ui_state.win, { 1, 2 })
+        vim.api.nvim_win_set_cursor(ui_state.win, { 1, 3 })
       end
     end,
   })
@@ -309,7 +366,7 @@ function M.open()
     end,
   })
 
-  vim.api.nvim_win_set_cursor(ui_state.win, { 1, 2 })
+  vim.api.nvim_win_set_cursor(ui_state.win, { 1, 3 })
   vim.cmd("startinsert")
 end
 
